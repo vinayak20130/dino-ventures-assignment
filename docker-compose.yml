@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: wallet-service-db
+    environment:
+      POSTGRES_DB: wallet_service
+      POSTGRES_USER: wallet_user
+      POSTGRES_PASSWORD: wallet_pass_2024
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wallet_user -d wallet_service']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  seed:
+    build: .
+    container_name: wallet-service-seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: wallet_user
+      DB_PASSWORD: wallet_pass_2024
+      DB_NAME: wallet_service
+      DB_SYNCHRONIZE: 'true'
+      DB_LOGGING: 'false'
+    command: ['node', 'dist/seed/seed.js']
+    restart: 'no'
+
+  app:
+    build: .
+    container_name: wallet-service-app
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      APP_PORT: 3000
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: wallet_user
+      DB_PASSWORD: wallet_pass_2024
+      DB_NAME: wallet_service
+      DB_SYNCHRONIZE: 'false'
+      DB_LOGGING: 'false'
+    ports:
+      - '3000:3000'
+
+volumes:
+  pgdata:
+    driver: local
